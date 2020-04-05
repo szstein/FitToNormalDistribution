@@ -181,7 +181,7 @@ int main(int argc, const char * argv[]) {
             std::cout << testSeries[i-1] <<"\t" << diffs[i-1] << "\t";
         }
         else {
-            std::cout << i << "\t \t ";
+            std::cout << "\t \t ";
         }
         std::cout << (int)(projectedTotal+0.5) << "\t" << (int)(projectedPerDay+0.5) << "\n";
     }
