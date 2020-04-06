@@ -64,6 +64,7 @@ std::string dayToDate(int day)
 //double testSeries[] = {0, 1, 2, 3, 7, 10, 12, 17, 21, 29, 34, 52, 79, 107, 148, 197, 233, 366, 463, 631, 827, 827, 1266, 1441, 1809, 2158, 2503, 2978, 3405, 4032, 4825, 5476, 6077, 6820, 7503, 8215, 9134, 10023, 10779, 11591, 12428, 13155, 13915, 14681};
 double *testSeries;
 double *diffs;
+double *smoothedDiffs;
 double startMean = 31;
 int nPoints;
 double multiplier;
@@ -116,15 +117,32 @@ int main(int argc, const char * argv[]) {
     }
     getPoints(argv[1]);
     diffs = (double*)malloc(nPoints*sizeof(double));
+    smoothedDiffs = (double*)malloc(nPoints*sizeof(double));
     std::cout << nPoints << "\n";
     diffs[0] = testSeries[0];
+    smoothedDiffs[0] = 0.75*diffs[0] + 0.25*diffs[1];
     for (int i=1;i<nPoints-1;i++) {
         diffs[i] = testSeries[i] - testSeries[i-1];
+        if (i==nPoints-1) {
+            smoothedDiffs[i] = 0.25*diffs[i-1] + 0.75*diffs[i];
+        }
+        else {
+            smoothedDiffs[i] = 0.25*diffs[i-1] + 0.5*diffs[i] + 0.25*diffs[i+1];
+        }
         std::cout << i << "\t" << diffs[i] << "\n";
         if (diffs[i]>maxDiff) {
             maxDiff = diffs[i];
             maxDiffPt = i;
         }
+    }
+    // if the last point is a max, move the ref point back one and smooth the last 3 values
+    if (maxDiffPt==nPoints-2) {
+        maxDiff = 0.25*diffs[maxDiffPt-2] + 0.5*diffs[maxDiffPt-1] + 0.25*diffs[maxDiffPt];
+        maxDiffPt -= 1;
+    }
+    else {
+        // smooth the max point
+        maxDiff = 0.25*diffs[maxDiffPt-1] + 0.5*diffs[maxDiffPt] + 0.25*diffs[maxDiffPt+1];
     }
     double bestScore = std::numeric_limits<double>::max();
     double bestM = 0;
