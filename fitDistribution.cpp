@@ -1,17 +1,59 @@
 //
-//  main.cpp
-//  fitDIstribution
+//  fitDistribution.cpp
+//  fitDistribution
 //
 //  Created by Stephen Stein on 4/2/20.
 //  Copyright © 2020 Stephen Stein. All rights reserved.
 //
-// NY deaths starting 3/14/2020
-
+// NAME
+//      fitDistribution - finds the cumulative distribution that best fits a set of points
+//
+// SYNOPSIS
+//      fitDistribution inputFile
+//
+// DESCRIPTION
+//      fitDistribution takes a set of points and computes the best-fitting cumulative distribution.
+//
+//      The input file to fitDistribution is a text file with a date on the first line followed by any number of data points, one per line
+//
+//      After reading the date and the data points, the program computes an array of differences between successive data points.
+//
+//      The program then cycles through possible means and standard deviations, computing a score for each which represents how well that
+//      mean and standard deviation fit the input points. The lowest score represents the best fitting mean and standard deviation.
+//
+//      The score is computed as follows:
+//      1. Find the multiplier.  Choose a difference value ("D") and note its index ("X") in the array of differences. Compute the value "V"
+//          of the standard normal distribution at that index (NORMDIST(X,Mean,StdDev)) for the given mean and stadard deviation. Compute
+//          the multiplier M = D/V.
+//      2. Compute a projected value array by summing the scaled values of the normal distribution M*NORMDIST(Index,Mean,StdDev)
+//          for Index ranging from 0 to the length of the input array.
+//      3. Find the difference between the input array and the projected array and square it for each index in the input array. Keep a
+//          running total of these squares.
+//      4. The total from step 3 is the "score"
+//
+//      NOTE - a smoothed value "D" in step 1 is the maximum of the differences array, smoothed by taking the weighted average of the
+//          preceding and succeeding values (25% each) and the max point itself (50%). If the maximum of the differences array is the
+//          last value, use the next-to-last value, smoothed, as "D" and decrement X by 1.
+//
+// OUTPUT
+//      The mean, standard deviation, score and multiplier for the best fit
+//      The best fit distribution, in columns separated by tabs. Each line contains:
+//          Index: the index of the point in the input array
+//          Date: "Index"-1 days after the input date. The input date is day 1.
+//          Actual Cumulative Total: The given input array
+//          Actual difference per day: The difference between the successive elements of the input array
+//          Projected Cumulative Total: The cumulative total of the scaled normal distribution on that day
+//          Projected difference per day: The scaled value of the normal distribution on that day
+//
+// RETURN VALUE
+//      0 on success, non-zero on failure
+//
 #define VERBOSE 0
 #include <iostream>
 #include <fstream>      // std::ifstream
 #include <cmath>
 
+// normal distribution utility routines
 double stdNorm(double x)
 {
     double y = (1.0/sqrt(2.0*M_PI))*exp(-0.5*x*x);
@@ -23,13 +65,16 @@ double norm(double x,double mean,double sig)
     double y = (1.0/sig)*stdNorm((x-mean)/sig);
     return y;
 }
-std::string datestring;
+
+// date computation utility routines
+int daysInMonth[] = {0,31,29,31,30,31,30,31,31,30,31,30,31};
 int monthFromDatestring(std::string str)
 {
     size_t slashPos = str.find("/");
     int retVal = std::stoi(str.substr(0,slashPos));
     return retVal;
 }
+
 int dayFromDatestring(std::string str)
 {
     size_t slashPos = str.find("/");
@@ -38,7 +83,7 @@ int dayFromDatestring(std::string str)
     return retVal;
 }
 
-int daysInMonth[] = {0,31,29,31,30,31,30,31,31,30,31,30,31};
+std::string datestring;    // the date string on line 1 of the input
 std::string dayToDate(int day)
 {
     int d = dayFromDatestring(datestring);
@@ -53,18 +98,9 @@ std::string dayToDate(int day)
     return std::string(buff);
 }
 
-
-// USA data 4/3
-//double testSeries[] = {14, 16, 18, 22, 24, 27, 36, 39, 49, 60, 71, 90, 112, 160, 219, 272, 398,
-//                        471, 675, 900, 1163, 1530, 1965, 2428, 2939, 3746, 4700, 5784, 6962};
-// NY 4/4
-// double testSeries[] = {3, 7, 7, 12, 12, 35, 44, 114, 114, 210, 285, 385, 519, 728, 965, 1218, 1550, 1941, 2373, 2935, 3565};
-
-// Italy 4/3
-//double testSeries[] = {0, 1, 2, 3, 7, 10, 12, 17, 21, 29, 34, 52, 79, 107, 148, 197, 233, 366, 463, 631, 827, 827, 1266, 1441, 1809, 2158, 2503, 2978, 3405, 4032, 4825, 5476, 6077, 6820, 7503, 8215, 9134, 10023, 10779, 11591, 12428, 13155, 13915, 14681};
 double *testSeries;
 double *diffs;
-double *smoothedDiffs;
+double *smoothedDiffs;      // computed but not used (yet?)
 double startMean = 31;
 int nPoints;
 double multiplier;
@@ -117,6 +153,7 @@ int main(int argc, const char * argv[]) {
     }
     getPoints(argv[1]);
     diffs = (double*)malloc(nPoints*sizeof(double));
+    // note: smoothedDiffs is computed but not used (yet?)
     smoothedDiffs = (double*)malloc(nPoints*sizeof(double));
     std::cout << nPoints << "\n";
     diffs[0] = testSeries[0];
@@ -146,10 +183,10 @@ int main(int argc, const char * argv[]) {
     }
     double bestScore = std::numeric_limits<double>::max();
     double bestM = 0;
-    double bestR = 0;
+    double bestStdDev = 0;
     for (int m = nPoints+20; m>nPoints-10; m--) {
         double bestScoreForMean = std::numeric_limits<double>::max();
-        double bestRforMean = 0;
+        double bestStdDevForMean = 0;
         for (int r=2; r<15; r++) {
             double score = scoreGuess(m, r);
 #if VERBOSE
@@ -157,42 +194,42 @@ int main(int argc, const char * argv[]) {
 #endif
             if (score<bestScoreForMean) {
                 bestScoreForMean = score;
-                bestRforMean = r;
+                bestStdDevForMean = r;
                 if (score<bestScore) {
                     bestScore = score;
                     bestM = m;
-                    bestR = r;
-                    std::cout << "BEST: mean=" << bestM << " dev=" << bestR << " score=" << bestScore << "\n";
+                    bestStdDev = r;
+                    std::cout << "BEST: mean=" << bestM << " dev=" << bestStdDev << " score=" << bestScore << "\n";
                 }
             }
         }
-        std::cout << "BEST score for mean=" << m << " dev=" << bestRforMean << " score=" << bestScoreForMean << "\n";
+        std::cout << "BEST score for mean=" << m << " dev=" << bestStdDevForMean << " score=" << bestScoreForMean << "\n";
     }
-    std::cout << "BEST: mean=" << bestM << " dev=" << bestR << " score=" << bestScore << "\n";
+    std::cout << "BEST: mean=" << bestM << " dev=" << bestStdDev << " score=" << bestScore << "\n";
     double downScore;
     double upScore;
-    downScore = scoreGuess(bestM,bestR-0.1);
+    downScore = scoreGuess(bestM,bestStdDev-0.1);
     if (downScore < bestScore) {
         while (downScore<bestScore) {
-            bestR -= 0.1;
+            bestStdDev -= 0.1;
             bestScore = downScore;
-            downScore = scoreGuess(bestM,bestR-0.1);
+            downScore = scoreGuess(bestM,bestStdDev-0.1);
         }
     }
     else {
-        upScore = scoreGuess(bestM,bestR+0.1);
+        upScore = scoreGuess(bestM,bestStdDev+0.1);
         while (upScore<bestScore) {
-            bestR += 0.1;
+            bestStdDev += 0.1;
             bestScore = upScore;
-            upScore = scoreGuess(bestM,bestR+0.1);
+            upScore = scoreGuess(bestM,bestStdDev+0.1);
         }
     }
-    bestScore = scoreGuess(bestM,bestR);
-    std::cout << "BEST: mean=" << bestM << " dev=" << bestR << " score=" << bestScore << " multiplier=" << multiplier << "\n";
+    bestScore = scoreGuess(bestM,bestStdDev);
+    std::cout << "BEST: mean=" << bestM << " dev=" << bestStdDev << " score=" << bestScore << " multiplier=" << multiplier << "\n";
     std::cout << "day\tdate\tdeaths\tdeaths/day\tdeaths(proj)\tdeaths/day(proj)\n";
     double projectedTotal = 0;
     for (int i=1; i<LASTDAY; i++) {
-        double projectedPerDay = (int)multiplier*norm(i,bestM,bestR);
+        double projectedPerDay = (int)multiplier*norm(i,bestM,bestStdDev);
         projectedTotal += projectedPerDay;
         std::cout << i << "\t" << dayToDate(i-1) << "\t";
         if (i<nPoints) {
