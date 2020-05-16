@@ -161,10 +161,10 @@ int main(int argc, const char * argv[]) {
     for (int i=1;i<nPoints-1;i++) {
         diffs[i] = testSeries[i] - testSeries[i-1];
         if (i==nPoints-1) {
-            smoothedDiffs[i] = 0.25*diffs[i-1] + 0.75*diffs[i];
+            smoothedDiffs[i] = 0.5*diffs[i-1] + 0.5*diffs[i];
         }
         else {
-            smoothedDiffs[i] = 0.25*diffs[i-1] + 0.5*diffs[i] + 0.25*diffs[i+1];
+            smoothedDiffs[i] = (diffs[i-1] + diffs[i] + diffs[i+1])/3.0;
         }
         std::cout << i << "\t" << diffs[i] << "\n";
         if (diffs[i]>maxDiff) {
@@ -174,17 +174,17 @@ int main(int argc, const char * argv[]) {
     }
     // if the last point is a max, move the ref point back one and smooth the last 3 values
     if (maxDiffPt==nPoints-2) {
-        maxDiff = 0.25*diffs[maxDiffPt-2] + 0.5*diffs[maxDiffPt-1] + 0.25*diffs[maxDiffPt];
+        maxDiff = (diffs[maxDiffPt-2] + diffs[maxDiffPt-1] + diffs[maxDiffPt])/3.0;
         maxDiffPt -= 1;
     }
     else {
         // smooth the max point
-        maxDiff = 0.25*diffs[maxDiffPt-1] + 0.5*diffs[maxDiffPt] + 0.25*diffs[maxDiffPt+1];
+        maxDiff = (diffs[maxDiffPt-1] + diffs[maxDiffPt] + diffs[maxDiffPt+1])/3.0;
     }
     double bestScore = std::numeric_limits<double>::max();
     double bestM = 0;
     double bestStdDev = 0;
-    for (int m = nPoints+20; m>nPoints-10; m--) {
+    for (int m = nPoints+60; m>0; m--) {
         double bestScoreForMean = std::numeric_limits<double>::max();
         double bestStdDevForMean = 0;
         for (int r=2; r<15; r++) {
