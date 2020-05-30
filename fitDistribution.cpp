@@ -106,7 +106,7 @@ int nPoints;
 double multiplier;
 int maxDiff = 0;
 int maxDiffPt = 0;
-#define LASTDAY 120
+#define LASTDAY 180
 
 double scoreGuess(double mean, double dev)
 {
@@ -187,7 +187,7 @@ int main(int argc, const char * argv[]) {
     for (int m = nPoints+60; m>0; m--) {
         double bestScoreForMean = std::numeric_limits<double>::max();
         double bestStdDevForMean = 0;
-        for (int r=2; r<15; r++) {
+        for (int r=2; r<40; r++) {
             double score = scoreGuess(m, r);
 #if VERBOSE
             std::cout << "mean="  << m << ", dev=" << r << ", score=" << score << "\n";
